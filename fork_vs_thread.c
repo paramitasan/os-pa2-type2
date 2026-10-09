@@ -69,7 +69,23 @@ int main(void)
      * ================================================================ */
 
     printf("\n=== Part 2: a forked PROCESS with its own copy ===\n");
-    printf("  TODO: implement this part (see the comment above)\n");
+
+    counter = 0; // resetting counter to 0 again
+                 // expectation: parent prints counter=0
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork failed");
+        return 1;
+    } else if (pid == 0) {
+        // Child process
+        counter = 999;
+        printf("[Child] Counter value: %d\n", counter);
+        _exit(0);
+    } else {
+        // Parent process
+        wait(NULL);
+        printf("[Parent] Counter value: %d\n", counter);
+    }
 
     return 0;
 }
