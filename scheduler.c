@@ -35,7 +35,7 @@
 #include "simlib.h"
 
 /* Set this to your algorithm's name; it appears in the report header. */
-static const char *ALGORITHM_NAME = "TODO: your algorithm";
+static const char *ALGORITHM_NAME = "SRTF";
 
 /* Round Robin / MLFQ only. Ignore it for the other algorithms. */
 static int TIME_QUANTUM = 2;
@@ -108,6 +108,13 @@ static PCB *fcfs_choose(Sim *sim, PCB *running)
  * ALWAYS break ties by the lowest PID, or your Gantt chart will not be
  * reproducible.
  */
+static int preemption_time[MAX_TIME];
+static int preempted_pid[MAX_TIME];
+static int preempted_left[MAX_TIME];
+static int next_pid[MAX_TIME];
+static int next_left[MAX_TIME];
+static int preemption_count = 0;
+
 static PCB *choose_next(Sim *sim, PCB *running)
 {
     /* TODO: replace this with your own algorithm.
@@ -115,7 +122,33 @@ static PCB *choose_next(Sim *sim, PCB *running)
      * While you are getting the build working you can leave the line below,
      * which simply runs the baseline. Your submission must NOT still call
      * fcfs_choose(): implementing your own algorithm is the assignment. */
-    return fcfs_choose(sim, running);
+
+    PCB *best = NULL;
+    for (int i = 0; i < sim->n; i++) {
+        PCB *p = &sim->proc[i];
+        if (p->arrival > sim->clock || p->remaining <= 0)
+            continue;
+        if (best == NULL ||
+            p->remaining < best->remaining ||
+            (p->remaining == best->remaining && p->pid < best->pid))
+            best = p;
+    }
+
+    /* A small array of records to detect a preemption when the process that is about
+     * to return is different from running and running still has remaining > 0 */
+
+    if (running != NULL && best != NULL && running != best && running->remaining > 0) {
+        int i = preemption_count;
+
+        preemption_time[i] = sim->clock;
+        preempted_pid[i] = running->pid;
+        preempted_left[i] = running->remaining;
+        next_pid[i] = best->pid;
+        next_left[i] = best->remaining;
+
+        preemption_count++;
+    }
+    return best;
 }
 
 /* ===================================================================== */
@@ -126,6 +159,7 @@ static PCB *choose_next(Sim *sim, PCB *running)
  * against another algorithm, a list of preemption events, the queue a process
  * sat in, and so on. Print it here. See your ASSIGNMENT.md for what is needed.
  */
+
 static void print_topic_extra(const Sim *sim)
 {
     /* REQUIRED for every topic: the comparison against the FCFS baseline.
@@ -135,6 +169,25 @@ static void print_topic_extra(const Sim *sim)
 
     /* TODO: your topic's own extra output, on top of the comparison above.
      *       See your ASSIGNMENT.md for what is required. */
+    
+    printf("\n===============================================================\n");
+    printf("                        PREEMPTION EVENTS\n"                          );
+    printf("===============================================================\n");
+
+    for (int i = 0; i < preemption_count; i++) {
+        printf("t=%-4d P%d PREEMPTED (%d left) -> P%d starts (%d left)\n",
+           preemption_time[i],
+           preempted_pid[i],
+           preempted_left[i],
+           next_pid[i],
+           next_left[i]
+        );
+    }
+
+    printf("---------------------------------------------------------------\n");
+    printf("Preemptions     : %d\n", preemption_count);
+    printf("Context switches: %d\n", sim->context_switches);
+    printf("===============================================================\n");
 }
 
 /* ===================================================================== */
